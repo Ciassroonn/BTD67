@@ -38,6 +38,7 @@ jobs:
     name: Deploy to Cloud Run
     needs: test
     runs-on: ubuntu-latest
+    if: ${{ secrets.GCP_SA_KEY != '' }}
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4

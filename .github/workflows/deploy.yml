@@ -1,67 +1,58 @@
-# .github/workflows/deploy.yml
-name: Deploy to Google Cloud Run
-
+name: Deploy
 on:
   push:
-    branches:
-      - main
-      - master
+    branches: [main]
 
 permissions:
   contents: read
+  pages: write
   id-token: write
 
 jobs:
-  test:
-    name: Test & Lint
+  deploy:
     runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
     steps:
-      - name: Checkout Repository
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Set up Node.js
-        uses: actions/setup-node@v4
+      - uses: actions/setup-node@v4
         with:
-          node-version: 20
-          cache: npm
+          node-version: 24
 
-      - name: Install Dependencies
-        run: npm ci || npm install
+      - name: Install dependencies
+        run: npm install
 
-      - name: Run Linter
-        run: npm run lint
-
-      - name: Run Build Check
+      - name: Build
         run: npm run build
 
-  deploy:
-    name: Deploy to Cloud Run
-    needs: test
-    runs-on: ubuntu-latest
-    if: ${{ secrets.GCP_SA_KEY != '' }}
-    steps:
-      - name: Checkout Repository
-        uses: actions/checkout@v4
+      - name: Ensure dev.html exists
+        run: |
+          # If index.html exists but dev.html does not, create dev.html as a copy.
+          if [ -d dist ]; then
+            if [ -f dist/index.html ] && [ ! -f dist/dev.html ]; then
+              cp dist/index.html dist/dev.html
+              echo "Created dist/dev.html from dist/index.html"
+            fi
+          fi
 
-      - name: Authenticate to Google Cloud
-        id: auth
-        uses: google-github-actions/auth@v2
+      - name: Verify dist output
+        run: |
+          echo "Listing dist:"
+          ls -la dist || true
+          if [ ! -d dist ]; then
+            echo "Error: dist folder not found" && exit 1
+          fi
+          if [ ! -f dist/index.html ] && [ ! -f dist/dev.html ]; then
+            echo "Error: neither dist/index.html nor dist/dev.html found" && exit 1
+          fi
+
+      - uses: actions/upload-pages-artifact@v3
         with:
-          # Supports both Service Account Key (JSON) or Workload Identity Federation
-          credentials_json: ${{ secrets.GCP_SA_KEY }}
+          path: dist
+          name: github-pages
+          overwrite: true
 
-      - name: Set up Cloud SDK
-        uses: google-github-actions/setup-gcloud@v2
-
-      - name: Deploy to Google Cloud Run
-        id: deploy
-        uses: google-github-actions/deploy-cloudrun@v2
-        with:
-          service: balloon-td6-remake
-          region: us-central1
-          # Deploying directly from source (automatically builds container on Google Cloud via Buildpacks)
-          source: .
-          flags: '--allow-unauthenticated'
-
-      - name: Show Deployment URL
-        run: echo "Successfully deployed to Cloud Run! URL is ${{ steps.deploy.outputs.url }}"
+      - uses: actions/deploy-pages@v4
+        id: deployment

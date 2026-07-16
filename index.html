@@ -1,0 +1,499 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>BTD Battles 2 — PvP Edition</title>
+  <link rel="stylesheet" href="css/style.css">
+  
+  <!-- Firebase Compat Library SDKs (Compat-mode ensures compatibility with simple script scripts) -->
+  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
+</head>
+<body>
+
+  <!-- =============================================
+       1. MENU SCREEN
+       ============================================= -->
+  <div id="menu-screen" class="screen active">
+    <div class="menu-logo">🎈</div>
+    <div class="menu-title" style="color: #ff6b00; text-shadow: 0 0 30px rgba(255,107,0,0.6);">BTD BATTLES 2</div>
+    <div class="menu-subtitle">PvP & Offline AI Arena</div>
+    
+    <!-- User Profile Quick Bar (Top Left) -->
+    <div id="menu-profile-bar" style="position: absolute; top: 1.5rem; left: 1.5rem; display: flex; align-items: center; gap: 10px; background: rgba(17,24,39,0.85); border: 1px solid var(--border); padding: 8px 16px; border-radius: 8px; cursor: pointer; transition: all 0.2s;" onclick="openProfileModal()">
+      <span style="font-size: 1.5rem;">🥷</span>
+      <div>
+        <div id="profile-bar-name" style="font-weight: bold; color: var(--accent);">Guest Player</div>
+        <div style="font-size: 0.72rem; color: var(--text-dim); display: flex; align-items: center; gap: 4px;">
+          <span>🏆</span> <span id="profile-bar-trophies">200</span> trophies
+        </div>
+      </div>
+    </div>
+
+    <!-- Leaderboard Quick Link (Top Right) -->
+    <button class="btn btn-small btn-green" style="position: absolute; top: 1.5rem; right: 1.5rem;" onclick="openLeaderboard()">
+      📊 Leaderboards
+    </button>
+    
+    <div class="menu-buttons" style="width: 320px;">
+      <button class="btn btn-full" onclick="startPracticeAI()">⚔️ Practice vs AI</button>
+      <button class="btn btn-orange btn-full" onclick="startMatchmakingQueue()">⚡ Find Online Match</button>
+      <button class="btn btn-green btn-full" onclick="showLobbySelect()">🎮 Create/Join Room</button>
+      <button class="btn btn-full" style="border-color: #8e44ad; color: #aa66ff;" onclick="openSettingsModal()">⚙️ Settings</button>
+    </div>
+
+    <div class="menu-version">V3.0 · Firebase Compat & High-Performance WebSockets Running</div>
+  </div>
+
+
+  <!-- =============================================
+       2. LOBBY SELECT SCREEN (Private Rooms)
+       ============================================= -->
+  <div id="lobby-select-screen" class="screen" style="flex-direction: column; align-items: center; justify-content: center; padding: 2rem;">
+    <div class="lobby-card" style="width: 480px;">
+      <h2>MULTIPLAYER GAME LOBBIES</h2>
+      
+      <div style="display: flex; gap: 1rem; margin-bottom: 2rem;">
+        <button class="btn btn-full" style="flex: 1;" onclick="createPrivateLobby()">Create Room</button>
+        <button class="btn btn-orange btn-full" style="flex: 1;" onclick="showJoinLobbyInput()">Join Room</button>
+      </div>
+
+      <div id="join-lobby-panel" style="display: none; border-top: 1px solid var(--border); padding-top: 1.5rem;">
+        <div class="modal-hint">Enter the 5-character Room Code:</div>
+        <input class="input-field" id="lobby-code-input" type="text" placeholder="e.g. LOBBY" style="text-align: center; font-size: 1.5rem; font-family: monospace; letter-spacing: 4px;">
+        <button class="btn btn-orange btn-full" onclick="joinPrivateLobby()">Connect to Room</button>
+      </div>
+
+      <!-- Private Room Waiting Area -->
+      <div id="private-lobby-area" style="display: none; border-top: 1px solid var(--border); padding-top: 1.5rem; margin-top: 1rem;">
+        <div style="text-align: center; margin-bottom: 1rem;">
+          <span class="hud-label">ROOM CODE</span>
+          <div id="private-code-display" style="font-size: 2rem; font-family: 'Orbitron', monospace; color: var(--gold); font-weight: bold; margin-top: 5px;">-----</div>
+          <div class="status-msg">Share this code with your friend to play!</div>
+        </div>
+
+        <div class="section-title">PLAYERS IN ROOM</div>
+        <div id="lobby-player-list" style="margin-bottom: 1rem;">
+          <div class="player-item"><div class="player-dot"></div>Host Player</div>
+          <div class="player-item" style="opacity: 0.5;"><div class="player-dot" style="background:#ff2244;"></div>Waiting for Opponent...</div>
+        </div>
+
+        <!-- Chat Box inside private lobby -->
+        <div class="section-title">ROOM CHAT</div>
+        <div id="lobby-chat-box" style="height: 100px; background: var(--bg); border: 1px solid var(--border); overflow-y: auto; padding: 8px; font-size: 0.8rem; margin-bottom: 8px; scrollbar-width: thin;"></div>
+        <div style="display: flex; gap: 6px;">
+          <input id="lobby-chat-input" class="input-field" type="text" placeholder="Type a message..." style="margin-bottom: 0; padding: 6px 12px; font-size: 0.85rem;" onkeydown="if(event.key==='Enter') sendLobbyChatMessage()">
+          <button class="btn btn-green btn-small" onclick="sendLobbyChatMessage()">Send</button>
+        </div>
+
+        <div style="display: flex; gap: 0.5rem; margin-top: 1.5rem;">
+          <button id="start-private-setup-btn" class="btn btn-green" style="flex: 1;" onclick="hostStartPrivateSetup()" disabled>Start Match</button>
+          <button class="btn btn-red" style="flex: 1;" onclick="leavePrivateLobby()">Leave Room</button>
+        </div>
+      </div>
+
+      <button class="btn btn-red btn-full" onclick="showScreen('menu-screen')" style="margin-top: 1.5rem;">Back to Main Menu</button>
+    </div>
+  </div>
+
+
+  <!-- =============================================
+       3. SEARCHING / MATCHMAKING SCREEN
+       ============================================= -->
+  <div id="searching-screen" class="screen" style="flex-direction: column; align-items: center; justify-content: center; background: radial-gradient(circle, #0e1d33 0%, #05080f 80%);">
+    <!-- Radar Scanning Pulse Animation -->
+    <div style="position: relative; width: 220px; height: 220px; border-radius: 50%; border: 2px solid rgba(0,212,255,0.25); display: flex; align-items: center; justify-content: center; margin-bottom: 2rem;">
+      <div style="position: absolute; inset: 10px; border-radius: 50%; border: 1.5px solid rgba(0,212,255,0.15);"></div>
+      <div style="position: absolute; inset: 40px; border-radius: 50%; border: 1px solid rgba(0,212,255,0.1);"></div>
+      
+      <!-- Rotating sweep -->
+      <div style="position: absolute; width: 100%; height: 100%; border-radius: 50%; background: conic-gradient(from 0deg, rgba(0,212,255,0.2) 0%, transparent 40%); animation: sweep 2.5s linear infinite;"></div>
+      
+      <span style="font-size: 4rem; z-index: 2; animation: bob 2s ease-in-out infinite;">🛸</span>
+    </div>
+
+    <h1 style="font-family: 'Orbitron', sans-serif; color: var(--accent); letter-spacing: 0.1em; font-size: 2rem; margin-bottom: 0.5rem; text-shadow: var(--shadow);">SEARCHING FOR OPPONENT</h1>
+    <p style="color: var(--text-dim); margin-bottom: 2rem; font-size: 0.95rem;">Matchmaking Queue Active... Connecting to lobby server</p>
+    
+    <div style="display: flex; gap: 1rem; width: 340px;">
+      <button class="btn btn-full btn-orange" onclick="startPracticeAIFromQueue()">Practice vs AI</button>
+      <button class="btn btn-full btn-red" onclick="cancelMatchmaking()">Cancel</button>
+    </div>
+
+    <style>
+      @keyframes sweep { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+    </style>
+  </div>
+
+
+  <!-- =============================================
+       4. BATTLE SETUP SCREEN (MAP VOTE & LOADOUT SELECTOR)
+       ============================================= -->
+  <div id="setup-screen" class="screen" style="flex-direction: column; padding: 2rem; overflow-y: auto; background: radial-gradient(circle, #111827 0%, #070b13 100%);">
+    <div style="max-width: 1000px; width: 100%; margin: auto;">
+      <div style="text-align: center; margin-bottom: 1.5rem;">
+        <h1 style="font-family: 'Orbitron', sans-serif; color: var(--accent); font-size: 2.2rem; letter-spacing: 0.05em; text-shadow: var(--shadow); margin-bottom: 5px;">BATTLE PREPARATION</h1>
+        <div id="setup-timer-txt" style="font-family: 'Orbitron', monospace; font-size: 1.4rem; color: var(--gold); font-weight: bold;">TIME REMAINING: 15s</div>
+      </div>
+
+      <!-- MAP VOTING SECTION -->
+      <div class="section-title">STEP 1: VOTE FOR THE MAP</div>
+      <div id="map-votes-container" style="display: flex; gap: 1.2rem; margin-bottom: 2rem;">
+        <!-- Filled dynamically: Zen Garden, Cyber Junction, Lava Trench -->
+      </div>
+
+      <!-- HERO SELECT -->
+      <div class="section-title">STEP 2: CHOOSE YOUR HERO (SELECT 1)</div>
+      <div id="setup-hero-pick" style="display: flex; gap: 1rem; flex-wrap: wrap; margin-bottom: 2rem; justify-content: center;">
+        <!-- Filled dynamically -->
+      </div>
+
+      <!-- TOWER SELECT -->
+      <div class="section-title">STEP 3: SELECT YOUR TOWER LOADOUT (SELECT EXACTLY 3)</div>
+      <div id="setup-tower-pick" style="display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 2.5rem; justify-content: center;">
+        <!-- Filled dynamically -->
+      </div>
+
+      <div style="display: flex; flex-direction: column; align-items: center; gap: 10px;">
+        <button id="setup-lock-btn" class="btn btn-green btn-full" style="max-width: 400px; padding: 1.2rem; font-size: 1.1rem;" onclick="lockInBattleLoadout()" disabled>LOCK IN LOADOUT</button>
+        <div id="setup-opponent-status" style="font-size: 0.85rem; color: var(--text-dim);">Waiting for opponent selection...</div>
+      </div>
+    </div>
+  </div>
+
+
+  <!-- =============================================
+       5. ACTIVE GAMEPLAY SCREEN
+       ============================================= -->
+  <div id="game-screen" class="screen">
+    <!-- HUD Top Bar -->
+    <div id="hud-top">
+      <div class="hud-stat">
+        <span class="hud-label">ROUND</span>
+        <span id="hud-round" class="hud-val">1</span>
+      </div>
+      <div class="hud-sep"></div>
+      
+      <!-- Solo stats fallback -->
+      <div class="hud-stat" id="solo-cash-stat">
+        <span class="hud-label">CASH</span>
+        <span id="hud-cash" class="hud-val gold">$0</span>
+      </div>
+      <div class="hud-sep" id="solo-cash-sep"></div>
+      
+      <div class="hud-stat" id="solo-lives-stat">
+        <span class="hud-label">LIVES</span>
+        <span id="hud-lives" class="hud-val red">150</span>
+      </div>
+      <div class="hud-sep" id="solo-lives-sep"></div>
+      
+      <div class="hud-stat" id="solo-eco-stat" style="display: none;">
+        <span class="hud-label">ECO</span>
+        <span id="hud-eco" class="hud-val green">$250</span>
+      </div>
+      <div class="hud-sep" id="solo-eco-sep" style="display: none;"></div>
+      
+      <div class="hud-stat">
+        <span class="hud-label">STATUS</span>
+        <span id="hud-wave-status" class="hud-val green">WAITING</span>
+      </div>
+      <div class="hud-sep"></div>
+      
+      <div class="hud-stat">
+        <span class="hud-label">ARENA MODE</span>
+        <span id="hud-diff" class="hud-val">PVP ARENA</span>
+      </div>
+
+      <div class="hud-right">
+        <button id="spd1" class="speed-btn active" onclick="setSpeed(1)">1x</button>
+        <button id="spd2" class="speed-btn" onclick="setSpeed(2)">2x</button>
+        <button id="spd3" class="speed-btn" onclick="setSpeed(3)">3x</button>
+        <button id="autostart-btn" class="speed-btn" onclick="toggleAuto()">AUTO</button>
+        <button id="start-wave-btn" class="btn btn-green btn-small" onclick="startWave()">Start Wave</button>
+        <button class="btn btn-small" onclick="showSaveModal()">Save / Load</button>
+        <button class="btn btn-red btn-small" onclick="quitGame()">Quit</button>
+      </div>
+    </div>
+
+    <!-- Active Game Layout Split -->
+    <div id="game-layout">
+      <!-- Main Arena Area -->
+      <div id="canvas-wrap" style="padding: 0;">
+        
+        <!-- SINGLEPLAYER CANVAS -->
+        <div id="single-canvas-container" style="width: 100%; height: 100%;">
+          <canvas id="game-canvas"></canvas>
+        </div>
+
+        <!-- BTD BATTLES 2 PVP DOUBLE LANES -->
+        <div id="pvp-canvases-container" style="display: none; width: 100%; height: 100%; gap: 10px; padding: 5px; background: #060911;">
+          <!-- Left Arena: My Lane -->
+          <div class="pvp-lane" id="my-lane" style="flex: 1; position: relative; height: 100%; border: 2px solid var(--accent); border-radius: 8px; overflow: hidden;">
+            <div class="pvp-lane-label" style="position: absolute; top: 10px; left: 10px; z-index: 100; font-family: 'Orbitron', sans-serif; color: var(--accent); font-weight: bold; background: rgba(17,24,39,0.85); padding: 6px 12px; border-radius: 6px; border: 1px solid var(--accent); font-size: 0.85rem; box-shadow: 0 4px 10px rgba(0,0,0,0.5);">
+              👤 <span id="my-name-display">YOU</span> (🏆<span id="my-trophies-display">200</span>)<br>
+              <span style="font-size: 0.75rem; color: #fff;">❤️ LIVES: <span id="my-pvp-lives" class="red" style="font-weight: 900;">150</span> · 💰 CASH: <span id="my-pvp-cash" class="gold" style="font-weight: 900;">$650</span> · 📈 ECO: <span id="my-pvp-eco" class="green" style="font-weight: 900;">$250</span></span>
+            </div>
+            <canvas id="my-pvp-canvas" style="width: 100%; height: 100%; cursor: crosshair; display: block;"></canvas>
+          </div>
+          
+          <!-- Right Arena: Opponent's Lane -->
+          <div class="pvp-lane" id="op-lane" style="flex: 1; position: relative; height: 100%; border: 2px solid var(--danger); border-radius: 8px; overflow: hidden;">
+            <div class="pvp-lane-label" style="position: absolute; top: 10px; left: 10px; z-index: 100; font-family: 'Orbitron', sans-serif; color: var(--danger); font-weight: bold; background: rgba(17,24,39,0.85); padding: 6px 12px; border-radius: 6px; border: 1px solid var(--danger); font-size: 0.85rem; box-shadow: 0 4px 10px rgba(0,0,0,0.5);">
+              🤖 <span id="op-name-display">OPPONENT</span> (🏆<span id="op-trophies-display">200</span>)<br>
+              <span style="font-size: 0.75rem; color: #fff;">❤️ LIVES: <span id="op-pvp-lives" class="red" style="font-weight: 900;">150</span> · 💰 CASH: <span id="op-pvp-cash" class="gold" style="font-weight: 900;">$650</span> · 📈 ECO: <span id="op-pvp-eco" class="green" style="font-weight: 900;">$250</span></span>
+            </div>
+            <canvas id="op-pvp-canvas" style="width: 100%; height: 100%; pointer-events: none; display: block;"></canvas>
+          </div>
+        </div>
+
+        <div id="wave-msg"></div>
+        
+        <!-- Game Over & Victory Overlay -->
+        <div id="gameover-overlay">
+          <div id="gameover-title" class="gameover-title">GAME OVER</div>
+          <div id="gameover-info" style="font-size: 1.1rem; color: var(--text-dim); text-align: center; max-width: 400px; line-height: 1.5;">Reached Round 1</div>
+          <button class="btn btn-orange" onclick="quitGame()" style="margin-top: 1rem;">Back to Menu</button>
+        </div>
+
+        <!-- Consumable Power-up Hotbar -->
+        <div id="powers-bar"></div>
+
+        <!-- Custom Deployable Hero Hotbar -->
+        <div id="hero-bar" style="display: none;">
+          <div id="hero-portrait">🏹</div>
+          <div style="flex: 1;">
+            <div id="hero-name-bar">Quincy</div>
+            <div class="hero-xp-track">
+              <div id="hero-xp-fill" class="hero-xp-fill"></div>
+            </div>
+            <div id="hero-lvl-txt">Lvl 1</div>
+          </div>
+          <button id="hero-ability-btn">
+            <span id="hero-ability-icon">💨</span>
+            <div id="hero-ability-cd" class="ability-cooldown" style="height: 0%;"></div>
+          </button>
+        </div>
+      </div>
+
+      <!-- Right Selection & Management Sidebar -->
+      <div id="right-panel">
+        <div id="panel-tabs">
+          <div id="tab-shop" class="panel-tab active" onclick="showShopPanel()">TOWERS</div>
+          <div id="tab-sends" class="panel-tab" style="display: none;" id="tab-sends-element" onclick="showSendsPanel()">SEND BLOONS</div>
+          <div id="tab-upgrade" class="panel-tab" style="pointer-events: none; opacity: 0.5;">UPGRADES</div>
+        </div>
+
+        <!-- Tab Content Inner Viewports -->
+        <div id="panel-content">
+          <!-- Filled dynamically: Tower list or Bloon Sends list -->
+        </div>
+
+        <!-- Upgrade Path Panel -->
+        <div id="upgrade-panel">
+          <div class="upgrade-tower-name" id="upg-name">Tower Name</div>
+          <div class="upgrade-tower-stats" id="upg-stats">Stats Details</div>
+          
+          <div class="target-priority">
+            <div class="upgrade-path-label">Target Priority</div>
+            <div id="target-buttons"></div>
+          </div>
+          
+          <div id="upg-paths"></div>
+          
+          <button class="sell-btn" id="sell-btn" onclick="sellSelectedTower()">SELL ($0)</button>
+          <button class="deselect-btn" id="deselect-btn" onclick="deselectTower()">CLOSE</button>
+        </div>
+
+        <!-- Co-op Networking Status Panel -->
+        <div id="mp-panel" style="display: none;">
+          <div class="section-title">Co-op Teammates</div>
+          <div id="mp-player-items"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+
+  <!-- =============================================
+       6. GLOBAL POPUP MODALS
+       ============================================= -->
+       
+  <!-- PROFILE & STATISTICS MODAL -->
+  <div id="profile-modal" class="save-load-modal" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.85); z-index: 1000; align-items: center; justify-content: center;">
+    <div class="modal-card" style="width: 440px;">
+      <div class="modal-head">
+        <span>PLAYER STATISTICS</span>
+        <button class="modal-close" onclick="closeProfileModal()">×</button>
+      </div>
+      <div style="text-align: center; margin-bottom: 1.5rem;">
+        <span style="font-size: 3.5rem;">🥷</span>
+        <div id="profile-name" style="font-family: 'Orbitron', sans-serif; font-size: 1.4rem; color: var(--gold); font-weight: bold; margin-top: 5px;">Guest Player</div>
+        <div style="font-size: 0.85rem; color: var(--text-dim); margin-top: 2px;">
+          Ranked Arena Competitor
+        </div>
+      </div>
+
+      <div class="section-title">ARENA PROGRESS</div>
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 1.5rem;">
+        <div style="background: var(--panel2); padding: 10px; text-align: center; border: 1px solid var(--border);">
+          <div style="font-size: 0.65rem; color: var(--text-dim); letter-spacing: 0.1em; text-transform: uppercase;">TROPHIES</div>
+          <div id="stat-trophies" style="font-family: 'Orbitron', sans-serif; font-size: 1.5rem; color: var(--gold); font-weight: bold;">200</div>
+        </div>
+        <div style="background: var(--panel2); padding: 10px; text-align: center; border: 1px solid var(--border);">
+          <div style="font-size: 0.65rem; color: var(--text-dim); letter-spacing: 0.1em; text-transform: uppercase;">WIN RATE</div>
+          <div id="stat-winrate" style="font-family: 'Orbitron', sans-serif; font-size: 1.5rem; color: var(--accent3); font-weight: bold;">0%</div>
+        </div>
+      </div>
+
+      <div class="section-title">BATTLE RECORD</div>
+      <div style="background: var(--bg); border: 1px solid var(--border); padding: 12px; font-size: 0.85rem; line-height: 1.8; margin-bottom: 1.5rem;">
+        <div style="display: flex; justify-content: space-between;">
+          <span style="color: var(--text-dim);">Matches Played:</span>
+          <span id="stat-played" style="font-weight: bold; color: var(--text);">0</span>
+        </div>
+        <div style="display: flex; justify-content: space-between;">
+          <span style="color: var(--text-dim);">Total Victories:</span>
+          <span id="stat-wins" style="font-weight: bold; color: var(--accent3);">0</span>
+        </div>
+        <div style="display: flex; justify-content: space-between;">
+          <span style="color: var(--text-dim);">Total Defeats:</span>
+          <span id="stat-losses" style="font-weight: bold; color: var(--danger);">0</span>
+        </div>
+        <div style="display: flex; justify-content: space-between;">
+          <span style="color: var(--text-dim);">Total Bloons Popped:</span>
+          <span id="stat-popped" style="font-weight: bold; color: var(--accent);">0</span>
+        </div>
+        <div style="display: flex; justify-content: space-between;">
+          <span style="color: var(--text-dim);">Eco Incomes Sent:</span>
+          <span id="stat-eco-sent" style="font-weight: bold; color: var(--gold);">0</span>
+        </div>
+      </div>
+
+      <div style="display: flex; gap: 8px;">
+        <input class="input-field" id="profile-name-input" type="text" placeholder="Change Profile Name" style="margin-bottom:0; flex:1;">
+        <button class="btn btn-green btn-small" onclick="saveProfileName()">Rename</button>
+      </div>
+      
+      <button class="btn btn-red btn-full" style="margin-top: 1.2rem;" onclick="closeProfileModal()">Close</button>
+    </div>
+  </div>
+
+  <!-- GLOBAL LEADERBOARDS MODAL -->
+  <div id="leaderboard-modal" class="save-load-modal" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.85); z-index: 1000; align-items: center; justify-content: center;">
+    <div class="modal-card" style="width: 480px;">
+      <div class="modal-head">
+        <span>GLOBAL ARENA LEADERBOARD</span>
+        <button class="modal-close" onclick="closeLeaderboard()">×</button>
+      </div>
+      <div style="font-size: 0.75rem; color: var(--text-dim); margin-bottom: 1rem; text-align: center;">
+        Rankings are updated in real-time. Win battles to climb!
+      </div>
+
+      <div style="height: 250px; background: var(--bg); border: 1px solid var(--border); overflow-y: auto; padding: 5px; scrollbar-width: thin;">
+        <table style="width: 100%; border-collapse: collapse; font-size: 0.82rem; text-align: left;">
+          <thead>
+            <tr style="border-bottom: 1.5px solid var(--border); color: var(--text-dim); font-size: 0.72rem; letter-spacing: 1px;">
+              <th style="padding: 6px;">RANK</th>
+              <th style="padding: 6px;">PLAYER</th>
+              <th style="padding: 6px; text-align: center;">W / L</th>
+              <th style="padding: 6px; text-align: right;">TROPHIES</th>
+            </tr>
+          </thead>
+          <tbody id="leaderboard-list">
+            <!-- Populated dynamically -->
+          </tbody>
+        </table>
+      </div>
+
+      <button class="btn btn-red btn-full" style="margin-top: 1.5rem;" onclick="closeLeaderboard()">Close</button>
+    </div>
+  </div>
+
+  <!-- GAME SETTINGS MODAL -->
+  <div id="settings-modal" class="save-load-modal" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.85); z-index: 1000; align-items: center; justify-content: center;">
+    <div class="modal-card" style="width: 400px;">
+      <div class="modal-head">
+        <span>GAME CONFIGURATION</span>
+        <button class="modal-close" onclick="closeSettingsModal()">×</button>
+      </div>
+
+      <div class="section-title">AUDIO SETTINGS</div>
+      <div style="background: var(--bg); border: 1px solid var(--border); padding: 12px; margin-bottom: 1.5rem; display: flex; flex-direction: column; gap: 10px; font-size: 0.85rem;">
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+          <span>Sound Effects (SFX)</span>
+          <input type="checkbox" id="settings-sfx" checked style="width: 18px; height: 18px; cursor: pointer;">
+        </div>
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+          <span>Background Ambient Pop</span>
+          <input type="checkbox" id="settings-ambient" checked style="width: 18px; height: 18px; cursor: pointer;">
+        </div>
+      </div>
+
+      <div class="section-title">ANTI-CHEAT CONFIG</div>
+      <div style="background: var(--bg); border: 1px solid var(--border); padding: 12px; margin-bottom: 1.5rem; font-size: 0.82rem; line-height: 1.5;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+          <span style="font-weight: bold; color: var(--gold);">Strict State Validation</span>
+          <input type="checkbox" id="settings-anticheat" checked style="width: 18px; height: 18px; cursor: pointer;">
+        </div>
+        <p style="color: var(--text-dim); font-size: 0.72rem;">Checks for rapid income changes, illegal level-ups, and double-crosspath upgrades in real-time, instantly correcting mismatched values.</p>
+      </div>
+
+      <div class="section-title">GRAPHICS DESIRED</div>
+      <div style="background: var(--bg); border: 1px solid var(--border); padding: 12px; margin-bottom: 1.5rem; font-size: 0.85rem; display: flex; justify-content: space-between; align-items: center;">
+        <span>Particle density</span>
+        <select id="settings-particles" class="input-field" style="margin-bottom:0; width: 120px; padding: 4px; font-size: 0.8rem; background: var(--panel);">
+          <option value="high">High density</option>
+          <option value="medium" selected>Medium</option>
+          <option value="low">Optimized Low</option>
+        </select>
+      </div>
+
+      <button class="btn btn-orange btn-full" onclick="saveSettings()">Apply settings</button>
+    </div>
+  </div>
+
+
+  <!-- PERSISTENT SAVE/LOAD STATE MODAL -->
+  <div id="save-load-modal">
+    <div class="modal-card">
+      <div class="modal-head">
+        <span>SAVE / LOAD STATE</span>
+        <button class="modal-close" onclick="hideSaveModal()">×</button>
+      </div>
+
+      <!-- Internal Pane Tabs -->
+      <div style="display: flex; gap: 0.5rem; margin-bottom: 1.2rem;">
+        <button class="btn btn-small" onclick="showSavePane()" style="flex: 1;">Save Progress</button>
+        <button class="btn btn-small btn-orange" onclick="showLoadPane()" style="flex: 1;">Load Save</button>
+      </div>
+
+      <!-- Save Code View -->
+      <div id="save-pane">
+        <div class="modal-hint">Copy your current game save code to save manually:</div>
+        <textarea id="save-code-text" readonly></textarea>
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 0.8rem;">
+          <button class="btn btn-small btn-green" onclick="copySaveCode()">Copy to Clipboard</button>
+          <span id="save-copy-status" style="color: var(--accent3); font-size: 0.75rem;"></span>
+        </div>
+      </div>
+
+      <!-- Load Save Input -->
+      <div id="load-pane" style="display: none;">
+        <div class="modal-hint">Paste an exported game save code below to restore your progress:</div>
+        <textarea id="load-code-input" placeholder="Paste save code here..."></textarea>
+        <button class="btn btn-small btn-orange btn-full" onclick="doLoadGame()" style="margin-top: 0.8rem;">Restore Game Session</button>
+        <div id="load-status" class="status-msg err" style="margin-top: 0.5rem;"></div>
+      </div>
+    </div>
+  </div>
+
+
+  <!-- =============================================
+       7. CORE GAME SCRIPTS
+       ============================================= -->
+  <script src="js/data.js"></script>
+  <script src="js/game.js"></script>
+</body>
+</html>

@@ -1,0 +1,16 @@
+{
+  "name": "balloon-td6-remake",
+  "version": "1.0.0",
+  "description": "Balloons TD 6 Remake with PeerJS Multiplayer Co-op support",
+  "main": "server.js",
+  "scripts": {
+    "dev": "node server.js",
+    "build": "echo 'No build required'",
+    "lint": "echo 'No lint required'",
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "express": "^4.19.2",
+    "ws": "^8.21.1"
+  }
+}

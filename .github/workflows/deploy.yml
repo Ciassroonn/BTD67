@@ -1,0 +1,66 @@
+# .github/workflows/deploy.yml
+name: Deploy to Google Cloud Run
+
+on:
+  push:
+    branches:
+      - main
+      - master
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  test:
+    name: Test & Lint
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install Dependencies
+        run: npm ci || npm install
+
+      - name: Run Linter
+        run: npm run lint
+
+      - name: Run Build Check
+        run: npm run build
+
+  deploy:
+    name: Deploy to Cloud Run
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Authenticate to Google Cloud
+        id: auth
+        uses: google-github-actions/auth@v2
+        with:
+          # Supports both Service Account Key (JSON) or Workload Identity Federation
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
+
+      - name: Set up Cloud SDK
+        uses: google-github-actions/setup-gcloud@v2
+
+      - name: Deploy to Google Cloud Run
+        id: deploy
+        uses: google-github-actions/deploy-cloudrun@v2
+        with:
+          service: balloon-td6-remake
+          region: us-central1
+          # Deploying directly from source (automatically builds container on Google Cloud via Buildpacks)
+          source: .
+          flags: '--allow-unauthenticated'
+
+      - name: Show Deployment URL
+        run: echo "Successfully deployed to Cloud Run! URL is ${{ steps.deploy.outputs.url }}"
